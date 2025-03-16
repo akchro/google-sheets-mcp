@@ -159,15 +159,109 @@ def mass_edit_spreadsheet(spreadsheet_id: str, ranges_and_values: List[tuple[str
         return None
 
 
+def hex_to_rgb(hex_color: str) -> dict:
+    """
+    Converts a hex color code (e.g., "#FF5733") to RGB format for Google Sheets API.
+
+    :param hex_color: The hex color code (e.g., "#FF5733").
+    :return: A dictionary with the RGB values for Google Sheets backgroundColor (e.g., {"red": 1.0, "green": 0.341, "blue": 0.2}).
+    """
+    hex_color = hex_color.lstrip('#')  # Remove leading '#' if present
+    r, g, b = bytes.fromhex(hex_color)  # Convert hex to RGB
+    return {
+        "red": r / 255,
+        "green": g / 255,
+        "blue": b / 255
+    }
+
+
+def fill_ranges_with_colors_in_spreadsheet(spreadsheet_id: str, ranges_and_colors: List[tuple[str, str]],
+                                           value_input_option: str = "USER_ENTERED") -> dict | None:
+
+    creds = None
+    # Check if the token.json file exists and load credentials from it
+    if os.path.exists("token.json"):
+        creds = Credentials.from_authorized_user_file("token.json", SCOPES)
+
+    # If credentials are not valid, refresh or authenticate again
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
+            creds = flow.run_local_server(port=0)
+        with open("token.json", "w") as token:
+            token.write(creds.to_json())
+
+    try:
+        service = build("sheets", "v4", credentials=creds)
+
+        # Prepare the requests for filling colors
+        requests = []
+
+        for range_to_fill, hex_color in ranges_and_colors:
+            # Convert hex color to RGB format
+            rgb_color = hex_to_rgb(hex_color)
+
+            # Parse the range (e.g., "A1:B2")
+            range_parts = range_to_fill.split(":")
+            start_cell = range_parts[0]
+            end_cell = range_parts[1]
+
+            # Calculate the row and column indices
+            start_row = int(start_cell[1:]) - 1  # Convert to 0-indexed
+            start_col = ord(start_cell[0].upper()) - ord('A')  # Convert column letter to index
+            end_row = int(end_cell[1:])  # Exclusive, so we do not subtract 1 here
+            end_col = ord(end_cell[0].upper()) - ord('A') + 1  # To include the last column
+
+            # Prepare the cells to fill within the specified range
+            rows = []
+            for row_index in range(start_row, end_row):
+                row_values = []
+                for col_index in range(start_col, end_col):
+                    row_values.append({
+                        "userEnteredFormat": {
+                            "backgroundColor": rgb_color
+                        }
+                    })
+                rows.append({"values": row_values})
+
+            # Create the updateCells request
+            requests.append({
+                "updateCells": {
+                    "range": {
+                        "sheetId": 0,  # Assuming sheetId 0, update with correct sheetId if needed
+                        "startRowIndex": start_row,
+                        "endRowIndex": end_row,
+                        "startColumnIndex": start_col,
+                        "endColumnIndex": end_col
+                    },
+                    "rows": rows,
+                    "fields": "userEnteredFormat.backgroundColor"
+                }
+            })
+
+        # Execute the batch update request
+        body = {"requests": requests}
+        result = service.spreadsheets().batchUpdate(spreadsheetId=spreadsheet_id, body=body).execute()
+
+        # Return the result which contains the number of updated cells
+        print(f"Cells updated with colors.")
+        return result
+
+    except HttpError as error:
+        print(f"An error occurred: {error}")
+        return None
+
+
 if __name__ == "__main__":
-    # List of tuples: (range_name, values)
-    ranges_and_values = [
-        ("A1:B2", [["Hello", "World"], ["Foo", "Bar"]]),
-        ("C1:D2", [["Test", "Value"], ["Example", "Update"]]),
+    ranges_and_colors = [
+        ("A1:B2", "#FF5733"),  # Hex color for red-orange
+        ("C3:D4", "#FFFF00"),  # Hex color for yellow
+        ("E5:F6", "#00FF00"),  # Hex color for green
+        ("G7:H8", "#800080")  # Hex color for purple
     ]
-    # Call mass_edit_spreadsheet function to batch update values
-    result = mass_edit_spreadsheet(
-        "1RDoRbpYKZflWJCRPT72dnnmrvfFK4stx1eaR38XKQag",  # Your spreadsheet ID
-        ranges_and_values  # Ranges and their values to be updated
+    fill_ranges_with_colors_in_spreadsheet(
+        spreadsheet_id="1bsmwdHv5wcxPbHnex4RGkTrwUoR-vl10gdO-L5Ohlrg", ranges_and_colors=ranges_and_colors
     )
-    print(result)
+

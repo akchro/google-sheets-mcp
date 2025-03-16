@@ -1,5 +1,5 @@
 from mcp.server.fastmcp import FastMCP
-from sheets_functions import get_user_spreadsheet_ids, create_new_spreadsheet, copy_to_spreadsheet, mass_edit_spreadsheet
+from sheets_functions import get_user_spreadsheet_ids, create_new_spreadsheet, copy_to_spreadsheet, mass_edit_spreadsheet, fill_ranges_with_colors_in_spreadsheet
 
 mcp = FastMCP("Google Sheets MCP")
 
@@ -56,40 +56,74 @@ def copy_spreadsheet(sheet_id_to: str, sheet_id_from: str):
 @mcp.tool()
 def edit_spreadsheet(spreadsheet_id, ranges_and_values):
     """
-Edits a spreadsheet with the given ID.
+        Fills specified ranges in a spreadsheet with colors.
 
-:param spreadsheet_id: The ID of the spreadsheet to edit.
-:param ranges_and_values:
-    A list of tuples, where each tuple contains:
-    1. A string representing the range to update (e.g., "A1:B2").
-    2. A list of lists, where each inner list represents a row of values to be inserted into that range.
+        :param spreadsheet_id: The ID of the spreadsheet to edit.
 
-    Example:
-    ranges_and_values = [
-        ("A1:B2", [["Hello", "World"], ["Foo", "Bar"]]),
-        ("C1:D2", [["Test", "Value"], ["Example", "Update"]]),
-    ]
-    In this example:
-    - The range "A1:B2" will be updated with two rows:
-      - Row 1: ["Hello", "World"]
-      - Row 2: ["Foo", "Bar"]
-    - The range "C1:D2" will be updated with:
-      - Row 1: ["Test", "Value"]
-      - Row 2: ["Example", "Update"]
+        :param ranges_and_colors:
+            A list of tuples, where each tuple contains:
+            1. A string representing the range to fill with a color (e.g., "A1:B2").
+            2. A string representing the color to fill the range with, provided in hex format (e.g., "#FF5733").
 
-    The values in each list will be placed in the corresponding cells of the given range.
+            Example:
+            ranges_and_colors = [
+                ("A1:B2", "#FF5733"),
+                ("C1:D2", "#4287f5"),
+                ("E3:F3", "#FFC300"),
+            ]
 
-    :param value_input_option: The input option for how the data should be entered. Default is "USER_ENTERED", which means the values will be entered as if a user typed them. Other possible options include "RAW" (values are entered as-is, without any formatting or interpretation).
+            In this example:
+            - The range "A1:B2" will be filled with the color "#FF5733" (a shade of red).
+            - The range "C1:D2" will be filled with the color "#4287f5" (a shade of blue).
+            - The range "E3:F3" will be filled with the color "#FFC300" (a shade of yellow).
 
-    :return: A dictionary with the result of the batch update, or None if there was an error. The dictionary contains the number of updated cells.
+            The color is applied to the entire range of cells specified.
+
     """
-
 
     result = mass_edit_spreadsheet(spreadsheet_id, ranges_and_values)
     if result is None:
         return "Unable to edit spreadsheet"
     return f"{result.get('totalUpdatedCells')} cells updated."
 
+
+@mcp.tool()
+def fill_spreadsheet(spreadsheet_id, ranges_and_colors):
+    """
+    Fills specified ranges in a spreadsheet with colors.
+
+    :param spreadsheet_id: The ID of the spreadsheet to edit.
+
+    :param ranges_and_colors:
+        A list of tuples, where each tuple contains:
+        1. A string representing the range to fill with a color (e.g., "A1:B2").
+        2. A string representing the color to fill the range with, provided in hex format (e.g., "#FF5733").
+
+        Example:
+        ranges_and_colors = [
+            ("A1:B2", "#FF5733"),
+            ("C1:D2", "#4287f5"),
+            ("E3:F3", "#FFC300"),
+        ]
+
+        In this example:
+        - The range "A1:B2" will be filled with the color "#FF5733" (a shade of red).
+        - The range "C1:D2" will be filled with the color "#4287f5" (a shade of blue).
+        - The range "E3:F3" will be filled with the color "#FFC300" (a shade of yellow).
+
+        The color is applied to the entire range of cells specified.
+
+    :param value_input_option:
+        The input option for how the data should be entered. This parameter is not used in this function as it primarily deals with formatting and color filling, but it's included for consistency with Google Sheets API conventions.
+
+    :return:
+        A dictionary with the result of the batch update, or None if there was an error. The dictionary contains the number of updated cells.
+"""
+
+    result = fill_ranges_with_colors_in_spreadsheet(spreadsheet_id, ranges_and_colors)
+    if result is None:
+        return "Unable to fill spreadsheet"
+    return f"Cells updated with colors."
 
 if __name__ == "__main__":
     mcp.run(transport='stdio')
